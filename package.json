@@ -1,0 +1,29 @@
+{
+  "name": "gmail-model",
+  "version": "1.0.0",
+  "description": "Various functions to interface with the Gmail REST API",
+  "main": "GmailModel.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nigelsdtech/gmail-model.git"
+  },
+  "keywords": [
+    "Gmail",
+    "RESTful",
+    "REST",
+    "API"
+  ],
+  "author": "Nigel Stephen D'Souza",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nigelsdtech/gmail-model/issues"
+  },
+  "homepage": "https://github.com/nigelsdtech/gmail-model#readme",
+  "dependencies": {
+    "googleapis": "2.x",
+    "do-google-auth": "github:nigelsdtech/do-google-auth"
+  }
+}
