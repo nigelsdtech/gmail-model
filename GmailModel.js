@@ -104,7 +104,7 @@ method.getAttachment = function (params,callback) {
       }
     )
   })
-
+}
 
 
 /**
