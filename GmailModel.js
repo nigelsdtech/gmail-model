@@ -63,6 +63,49 @@ function GmailModel(params) {
   this.log.setLevel(params.logLevel);
 }
 
+/**
+ * gmailModel.getAttachment
+ *
+ * @desc Gets the specified attachment.
+ *
+ * @alias gmailModel.getAttachment
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.attachmentId - The ID of the attachment being retrieved.
+ * @param  {string} params.messageId - The message the attachment belongs to being retrieved.
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.getAttachment = function (params,callback) {
+
+  var self = this;
+
+  self.log.debug('Getting attachment')
+
+  // Authorize a client with the loaded credentials, then call the
+  // Gmail API.
+  googleAuth.authorize( function (auth) {
+
+    self.gmail.users.messages.attachments.get(
+      {
+        auth: auth,
+        userId: self.userId,
+        id: params.attachmentId,
+        messageId: params.messageId
+      },
+      function(err, response) {
+        if (err) {
+          console.log('gmailModel.getAttachment: The API returned an error: ' + err);
+        } else {
+          self.log.trace('Returned response:')
+          self.log.trace(response)
+          callback(response)
+        }
+      }
+    )
+  })
+
+
 
 /**
  * gmailModel.getLabelId
