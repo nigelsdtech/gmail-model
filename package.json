@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/nigelsdtech/gmail-model#readme",
   "dependencies": {
-    "do-google-auth": "git://github.com/nigelsdtech/do-google-auth.git#1a16931db300db862c3136b1d33107e25b5c17fb",
+    "do-google-auth": "nigelsdtech/do-google-auth",
     "googleapis": "2.x"
   }
 }
