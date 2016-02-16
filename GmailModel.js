@@ -1,10 +1,10 @@
 /**
- * Copyright (c) 2016, 
- * 
+ * Copyright (c) 2016,
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -22,11 +22,11 @@ var doGoogleAuth = require('do-google-auth');
 var method = GmailModel.prototype;
 
 var name
-  , userId
-  , gmail
-  , googleAuth
-  , log
-  , log4js;
+   ,userId
+   ,gmail
+   ,googleAuth
+   ,log
+   ,log4js;
 
 
 
@@ -49,9 +49,9 @@ function GmailModel(params) {
   googleAuth = new doGoogleAuth(
     params.googleScopes,
     params.tokenFile,
-    params.tokenDir, 
+    params.tokenDir,
     params.clientSecretFile
-  ); 
+  );
 
   this.googleAuth = params.googleAuth;
 
@@ -61,6 +61,50 @@ function GmailModel(params) {
   this.log4js = params.log4js
   this.log = this.log4js.getLogger('Mailbox-' + this.name);
   this.log.setLevel(params.logLevel);
+}
+
+/**
+ * gmailModel.createLabel
+ *
+ * @desc Gets the specified attachment.
+ *
+ * @alias gmailModel.createLabel
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.labelName - The name of the label to create
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.createLabel = function (params,callback) {
+
+  var self = this;
+
+  self.log.info('Creating label: ' + params.labelName)
+
+  // Authorize a client with the loaded credentials, then call the
+  // Gmail API.
+  googleAuth.authorize( function (auth) {
+
+    self.gmail.users.labels.create({
+      auth: auth,
+      userId: self.userId,
+      resource: {
+        name: params.labelName
+      }
+    }, function(err, response) {
+
+      if (err) {
+        callback(new Error('gmailModel.createLabel: The API returned an error: ' + err))
+        return null
+      }
+
+      self.log.trace('Returned response:')
+      self.log.trace(response)
+
+      self.log.info('Label created: %s', params.labelName)
+      callback(null,response.id)
+    });
+  });
 }
 
 /**
@@ -116,7 +160,8 @@ method.getAttachment = function (params,callback) {
  * @memberOf! gmailModel(v1)
  *
  * @param  {object} params - Parameters for request
- * @param  {string} params.labelName - The name of the label for whisch an ID is being retrieved.
+ * @param  {string} params.labelName - The name of the label for which an ID is being retrieved.
+ * @param  {string} params.createIfNotExists - Create the label if it doesn't exist
  * @param  {callback} callback - The callback that handles the response.
  */
 method.getLabelId = function (params,callback) {
@@ -127,27 +172,45 @@ method.getLabelId = function (params,callback) {
 
   self.listLabels ( function (labels) {
 
-      if (labels.length == 0) {
+    var retErr, labelId;
 
-        self.log.info('No labels found.');
-	callback("")
+    if (labels.length == 0) {
 
-      } else {
+      self.log.info('No labels found.');
 
-        for (var i = 0; i < labels.length; i++) {
+    } else {
 
-	  var label = labels[i]
+      self.log.debug('gmail.getLabelId: Found %s labels', labels.length)
 
-          if ( label.name == params.labelName ) {
-            self.log.debug('Checking label - %s (%s)', label.name, label.id);
-	    callback(label.id)
-	    break
-          }
+      for (var i = 0; i < labels.length; i++) {
+
+        var label = labels[i]
+
+        if ( label.name == params.labelName ) {
+          self.log.debug('Checking label - %s (%s)', label.name, label.id);
+          labelId = label.id
+          break
         }
-
       }
     }
-  )
+
+    // Create the label if it doesn't exist
+    if (!labelId && params.hasOwnProperty('createIfNotExists') && params.createIfNotExists) {
+      self.createLabel({
+        labelName: params.labelName
+      }, function (err, labelId) {
+        if (err) {
+          self.log.error('gmailModel.getLabelId error: ' + err);
+          retErr = err
+        } else {
+          labelId = labelId
+        }
+      });
+    }
+
+
+    callback(retErr, labelId);
+  });
 }
 
 /**
@@ -277,13 +340,13 @@ method.listMessages = function (params,callback)  {
           return;
         }
 
-	var messages
+        var messages
 
-	if (response.resultSizeEstimate == 0) {
-	  messages = []
-	} else {
-	  messages = response.messages;
-	}
+        if (response.resultSizeEstimate == 0) {
+          messages = []
+        } else {
+          messages = response.messages;
+        }
 
         callback(messages)
 
@@ -292,6 +355,53 @@ method.listMessages = function (params,callback)  {
   })
 
 }
+
+/**
+ * gmailModel.updateMessage
+ *
+ * @desc Updates a message
+ *
+ * @alias gmailModel.updateMessage
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.messageId   - Message to modify
+ * @param  {string} params.addLabelIds - List of label ID's to add to the message
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.updateMessage = function (params,callback)  {
+
+  var self = this
+
+  self.log.info('Updating message %s', params.messageId)
+
+  // Authorize a client with the loaded credentials, then call the
+  // Gmail API.
+  googleAuth.authorize( function (auth) {
+
+        //removeLabelIds: []
+    self.gmail.users.messages.modify({
+      auth: auth,
+      id: params.messageId,
+      userId: self.userId,
+      resource: {
+        addLabelIds: params.addLabelIds
+      }
+    }, function(err, response) {
+      if (err) {
+        var errMsg = 'gmailModel.updateMessage: The google API returned an error: ' + err;
+        self.log.error(errMsg)
+        callback(new Error(errMsg))
+        return null
+      }
+
+      self.log.trace('Returned response:')
+      self.log.trace(response)
+      callback(null, response)
+    });
+  });
+}
+
 
 
 
