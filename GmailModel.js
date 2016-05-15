@@ -187,7 +187,7 @@ method.getLabelId = function (params,callback) {
         var label = labels[i]
 
         if ( label.name == params.labelName ) {
-          self.log.debug('Checking label - %s (%s)', label.name, label.id);
+          self.log.debug('Label matches - %s (%s)', label.name, label.id);
           labelId = label.id
           break
         }
@@ -385,7 +385,8 @@ method.updateMessage = function (params,callback)  {
       id: params.messageId,
       userId: self.userId,
       resource: {
-        addLabelIds: params.addLabelIds
+        addLabelIds: params.addLabelIds,
+        removeLabelIds: params.removeLabelIds
       }
     }, function(err, response) {
       if (err) {
