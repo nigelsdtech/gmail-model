@@ -83,7 +83,9 @@ method.createLabel = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize( err, function (auth) {
+
+    if (err) { callback(err); return null}
 
     self.gmail.users.labels.create({
       auth: auth,
@@ -93,10 +95,7 @@ method.createLabel = function (params,callback) {
       }
     }, function(err, response) {
 
-      if (err) {
-        callback(new Error('gmailModel.createLabel: The API returned an error: ' + err))
-        return null
-      }
+      if (err) { callback(err); return null}
 
       self.log.trace('Returned response:')
       self.log.trace(response)
@@ -128,7 +127,9 @@ method.getAttachment = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize( err, function (auth) {
+
+    if (err) { callback(err); return null}
 
     self.gmail.users.messages.attachments.get(
       {
@@ -143,7 +144,7 @@ method.getAttachment = function (params,callback) {
         } else {
           self.log.trace('Returned response:')
           self.log.trace(response)
-          callback(response)
+          callback(null,response)
         }
       }
     )
@@ -233,7 +234,9 @@ method.getMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize(err, function (auth) {
+
+    if (err) { callback(err); return null}
 
     self.gmail.users.messages.get(
       {
@@ -247,7 +250,7 @@ method.getMessage = function (params,callback)  {
         } else {
           self.log.trace('Returned response:')
           self.log.trace(response)
-          callback(response)
+          callback(err, response)
         }
       }
     )
@@ -274,7 +277,9 @@ method.listLabels = function (callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize( err, function (auth) {
+
+    if (err) { callback(err); return null}
 
     self.gmail.users.labels.list({
       auth: auth,
@@ -285,7 +290,7 @@ method.listLabels = function (callback)  {
         return;
       }
       var labels = response.labels;
-      callback(labels)
+      callback(null,labels)
 
     })
   })
@@ -313,7 +318,9 @@ method.listMessages = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize(err, function (auth) {
+
+    if (err) { callback(err); return null}
 
     var gParams = {
       auth: auth,
@@ -348,7 +355,7 @@ method.listMessages = function (params,callback)  {
           messages = response.messages;
         }
 
-        callback(messages)
+        callback(null,messages)
 
       }
     )
@@ -377,9 +384,10 @@ method.updateMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (auth) {
+  googleAuth.authorize(err, function (auth) {
 
-        //removeLabelIds: []
+    if (err) { callback(err); return null}
+
     self.gmail.users.messages.modify({
       auth: auth,
       id: params.messageId,
@@ -392,7 +400,7 @@ method.updateMessage = function (params,callback)  {
       if (err) {
         var errMsg = 'gmailModel.updateMessage: The google API returned an error: ' + err;
         self.log.error(errMsg)
-        callback(new Error(errMsg))
+        callback(err)
         return null
       }
 
