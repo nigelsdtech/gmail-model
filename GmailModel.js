@@ -83,7 +83,7 @@ method.createLabel = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( err, function (auth) {
+  googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -127,7 +127,7 @@ method.getAttachment = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( err, function (auth) {
+  googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -171,14 +171,14 @@ method.getLabelId = function (params,callback) {
 
   self.log.debug('Getting ID for label')
 
-  self.listLabels ( function (labels) {
+  self.listLabels ( function (err, labels) {
+
+    if (err) { callback(err); return null }
 
     var retErr, labelId;
 
     if (labels.length == 0) {
-
       self.log.info('No labels found.');
-
     } else {
 
       self.log.debug('gmail.getLabelId: Found %s labels', labels.length)
@@ -189,28 +189,30 @@ method.getLabelId = function (params,callback) {
 
         if ( label.name == params.labelName ) {
           self.log.debug('Label matches - %s (%s)', label.name, label.id);
-          labelId = label.id
-          break
+          callback(null,label.id)
+          return null
         }
       }
     }
 
-    // Create the label if it doesn't exist
-    if (!labelId && params.hasOwnProperty('createIfNotExists') && params.createIfNotExists) {
+    // Getting this far means the label doesn't exist
+    if (params.createIfNotExists) {
+
       self.createLabel({
         labelName: params.labelName
       }, function (err, labelId) {
         if (err) {
           self.log.error('gmailModel.getLabelId error: ' + err);
-          retErr = err
+          callback(err)
         } else {
-          labelId = labelId
+          callback(null,labelId)
         }
       });
+
+    } else {
+      callback(null,null)
     }
 
-
-    callback(retErr, labelId);
   });
 }
 
@@ -234,7 +236,7 @@ method.getMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(err, function (auth) {
+  googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -277,7 +279,7 @@ method.listLabels = function (callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( err, function (auth) {
+  googleAuth.authorize( function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -287,6 +289,7 @@ method.listLabels = function (callback)  {
     }, function(err, response) {
       if (err) {
         console.log('The API returned an error: ' + err);
+        callback(err)
         return;
       }
       var labels = response.labels;
@@ -318,7 +321,7 @@ method.listMessages = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(err, function (auth) {
+  googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -384,7 +387,7 @@ method.updateMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(err, function (auth) {
+  googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
