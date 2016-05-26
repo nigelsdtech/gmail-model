@@ -106,6 +106,45 @@ method.createLabel = function (params,callback) {
   });
 }
 
+
+/**
+ * gmailModel.deleteLabel
+ *
+ * @desc Gets the specified attachment.
+ *
+ * @alias gmailModel.deleteLabel
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.labelId - The id of the label to delete
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.deleteLabel = function (params,callback) {
+
+  var self = this;
+
+  self.log.info('Deleting label: ' + params.labelId)
+
+  // Authorize a client with the loaded credentials, then call the
+  // Gmail API.
+  googleAuth.authorize(function (err, auth) {
+
+    if (err) { callback(err); return null}
+
+    self.gmail.users.labels.delete({
+      auth: auth,
+      userId: self.userId,
+      id: params.labelId
+    }, function(err, response) {
+
+      if (err) { callback(err); return null}
+      self.log.info('Deleted label: %s', params.labelId)
+      callback(null)
+    });
+  });
+}
+
+
 /**
  * gmailModel.getAttachment
  *
