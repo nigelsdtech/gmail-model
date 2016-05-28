@@ -16,8 +16,9 @@
 
 "use strict"
 
-var google       = require('googleapis');
-var doGoogleAuth = require('do-google-auth');
+const google       = require('googleapis'),
+      doGoogleAuth = require('do-google-auth'),
+      base64url    = require('base64-url')
 
 var method = GmailModel.prototype;
 
@@ -216,42 +217,37 @@ method.getLabelId = function (params,callback) {
 
     var retErr, labelId;
 
-    if (labels.length == 0) {
-      self.log.info('No labels found.');
-    } else {
+    if (labels.length != 0) {
 
       self.log.debug('gmail.getLabelId: Found %s labels', labels.length)
 
-      for (var i = 0; i < labels.length; i++) {
-
-        var label = labels[i]
-
-        if ( label.name == params.labelName ) {
-          self.log.debug('Label matches - %s (%s)', label.name, label.id);
-          callback(null,label.id)
+      labels.forEach ( function (elem, idx, array) {
+        if ( elem.name == params.labelName ) {
+          self.log.debug('Label matches - %s (%s)', elem.name, elem.id);
+          callback(null,elem.id)
           return null
-        }
-      }
-    }
-
-    // Getting this far means the label doesn't exist
-    if (params.createIfNotExists) {
-
-      self.createLabel({
-        labelName: params.labelName
-      }, function (err, labelId) {
-        if (err) {
-          self.log.error('gmailModel.getLabelId error: ' + err);
-          callback(err)
-        } else {
-          callback(null,labelId)
         }
       });
 
     } else {
-      callback(null,null)
-    }
 
+      self.log.info('No labels found.');
+
+      // Getting this far means the label doesn't exist
+      if (params.createIfNotExists) {
+
+        self.createLabel({
+          labelName: params.labelName
+        }, function (err, labelId) {
+          if (err) {
+            self.log.error('gmailModel.getLabelId error: ' + err);
+            callback(err)
+          } else {
+            callback(null,labelId)
+          }
+        });
+      }
+    }
   });
 }
 
@@ -362,28 +358,18 @@ method.listMessages = function (params,callback)  {
   // Gmail API.
   googleAuth.authorize(function (err, auth) {
 
-    if (err) { callback(err); return null}
+    if (err) { callback(err); return null }
 
     var gParams = {
       auth: auth,
       userId: self.userId,
     }
 
-    if (params.hasOwnProperty('freetextSearch')) {
-      gParams.q = params.freetextSearch
-    }
+    if (params.hasOwnProperty('freetextSearch')) gParams.q          = params.freetextSearch;
+    if (params.hasOwnProperty('labelIds'))       gParams.labelIds   = params.labelIds;
+    if (params.hasOwnProperty('maxResults'))     gParams.maxResults = params.maxResults;
 
-    if (params.hasOwnProperty('labelIds')) {
-      gParams.labelIds = params.labelIds
-    }
-
-    if (params.hasOwnProperty('maxResults')) {
-      gParams.maxResults = params.maxResults
-    }
-
-    self.gmail.users.messages.list(
-      gParams,
-      function(err, response) {
+    self.gmail.users.messages.list( gParams, function(err, response) {
         if (err) {
           console.log('The API returned an error: ' + err);
           return;
@@ -399,11 +385,109 @@ method.listMessages = function (params,callback)  {
 
         callback(null,messages)
 
+    });
+  });
+
+}
+
+/**
+ * gmailModel.sendMessage
+ *
+ * @desc Send an email
+ *
+ * @alias gmailModel.sendMessages
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.from - The sender
+ * @param  {string} params.to - The recipient
+ * @param  {string} params.cc - cc
+ * @param  {string} params.bcc - bcc
+ * @param  {string} params.subject - subject
+ * @param  {string} params.body - Email body
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.sendMessage = function (params,callback)  {
+
+  var self = this;
+
+  self.log.debug('Sending message')
+
+  // Authorize a client with the loaded credentials, then call the
+  // Gmail API.
+  googleAuth.authorize(function (err, auth) {
+
+    if (err) { callback(err); return null}
+
+    // Turn the input parameters into RAW content
+    var raw = ""
+    raw += "from: "    + params.from
+    raw += "\r\nto: "      + params.to
+    if (params.cc)  raw += "\r\ncc: "  + params.cc;
+    if (params.bcc) raw += "\r\nbcc: " + params.bcc;
+    raw += "\r\nSubject:"  + params.subject
+    raw += "\r\n"  + params.body
+
+    var rawb64 = base64url.encode(raw);
+    self.log.debug('b64 encoded message:\n' + rawb64);
+
+    self.gmail.users.messages.send({
+      auth: auth,
+      userId: self.userId,
+      resource: {
+        raw: rawb64
       }
-    )
+    }, function(err, response) {
+
+        if (err) { callback(err); return null }
+
+        self.log.debug('sendMessage - Received response:')
+        self.log.debug(response)
+        callback(null,response)
+
+    })
   })
 
 }
+
+/**
+ * gmailModel.trashMessage
+ *
+ * @desc Trashes a message
+ *
+ * @alias gmailModel.trashMessage
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object} params - Parameters for request
+ * @param  {string} params.messageId   - Message to trash
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.updateMessage = function (params,callback)  {
+
+  var self = this
+
+  googleAuth.authorize(function (err, auth) {
+
+    if (err) { callback(err); return null}
+
+    self.gmail.users.messages.trash({
+      auth: auth,
+      id: params.messageId,
+      userId: self.userId,
+    }, function(err, response) {
+
+      if (err) {
+        var errMsg = 'gmailModel.updateMessage: The google API returned an error: ' + err;
+        self.log.error(errMsg)
+        callback(err)
+        return null
+      }
+
+      callback(null,message);
+    });
+  });
+}
+
 
 /**
  * gmailModel.updateMessage
