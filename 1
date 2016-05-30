@@ -448,59 +448,39 @@ method.sendMessage = function (params,callback)  {
 }
 
 /**
- * gmailModel.trashMessages
+ * gmailModel.trashMessage
  *
- * @desc Trashes messages passed in
+ * @desc Trashes a message
  *
- * @alias gmailModel.trashMessages
+ * @alias gmailModel.trashMessage
  * @memberOf! gmailModel(v1)
  *
  * @param  {object} params - Parameters for request
- * @param  {string} params.messageIds - Messages to trash
- * @param  {string} params.responses - Responses from trashed messages (only used when calling recursively)
+ * @param  {string} params.messageId   - Message to trash
  * @param  {callback} callback - The callback that handles the response.
  */
-method.trashMessages = function (params,callback)  {
+method.trashMessage = function (params,callback)  {
 
   var self = this
-
-  var messageIds = params.messageIds,
-      messageId  = messageIds[0];
-
-  // Initialize params.responses if this isn't a recursive call
-  var responses = (typeof params.responses !== 'undefined')? params.responses : [];
-
 
   googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null }
 
-    self.log.info('Trashing message ' + messageId);
     self.gmail.users.messages.trash({
       auth: auth,
       userId: self.userId,
-      id: messageId
+      id: params.messageId
     }, function(err, response) {
 
       if (err) {
-        var errMsg = 'gmailModel.trashMessage: The google API returned an error when trashing message ' + messageId + ': ' + err;
+        var errMsg = 'gmailModel.trashMessage: The google API returned an error: ' + err;
         self.log.error(errMsg)
         callback(err)
         return null
       }
 
-      self.log.info('Trashed message ' + messageId);
-      responses.push(response);
-
-      messageIds.splice(0,1)
-      if (params.messageIds.length > 1) { 
-        self.trashMessages({
-          messageIds: messageIds,
-          responses: responses
-        }, callback);
-      } else {
-        callback(null,responses)
-      }
+      callback(null,message);
     });
   });
 }
