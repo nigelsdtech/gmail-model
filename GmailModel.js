@@ -18,7 +18,7 @@
 
 const google       = require('googleapis'),
       doGoogleAuth = require('do-google-auth'),
-      base64url    = require('base64-url')
+      emailjs      = require('emailjs')
 
 var method = GmailModel.prototype;
 
@@ -27,7 +27,9 @@ var name
    ,gmail
    ,googleAuth
    ,log
-   ,log4js;
+   ,log4js
+   ,appSpecificPassword
+   ,user;
 
 
 
@@ -46,6 +48,9 @@ function GmailModel(params) {
 
   this.name      = params.name
   this.userId    = params.userId
+
+  this.user      = params.user
+  this.appSpecificPassword  = params.appSpecificPassword
 
   googleAuth = new doGoogleAuth(
     params.googleScopes,
@@ -267,7 +272,7 @@ method.getMessage = function (params,callback)  {
 
   var self = this;
 
-  self.log.debug('Getting message')
+  self.log.debug('gmailModel.getMessage: Getting message')
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
@@ -284,10 +289,11 @@ method.getMessage = function (params,callback)  {
       function(err, response) {
         if (err) {
           console.log('The API returned an error: ' + err);
+	  callback(err)
         } else {
           self.log.trace('Returned response:')
           self.log.trace(response)
-          callback(err, response)
+          callback(null, response)
         }
       }
     )
@@ -353,6 +359,7 @@ method.listMessages = function (params,callback)  {
   var self = this;
 
   self.log.debug('Listing messages')
+  self.log.debug('With search criteria: ' + params.freetextSearch)
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
@@ -401,8 +408,6 @@ method.listMessages = function (params,callback)  {
  * @param  {object} params - Parameters for request
  * @param  {string} params.from - The sender
  * @param  {string} params.to - The recipient
- * @param  {string} params.cc - cc
- * @param  {string} params.bcc - bcc
  * @param  {string} params.subject - subject
  * @param  {string} params.body - Email body
  * @param  {callback} callback - The callback that handles the response.
@@ -413,40 +418,32 @@ method.sendMessage = function (params,callback)  {
 
   self.log.debug('Sending message')
 
-  // Authorize a client with the loaded credentials, then call the
-  // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  var server = emailjs.server.connect({
+    user:     self.user,
+    password: self.appSpecificPassword,
+    host:     'smtp.gmail.com',
+    ssl:      true
+  });
 
-    if (err) { callback(err); return null}
+  var from    = params.from,
+      to      = params.to,
+      subject = params.subject;
 
-    // Turn the input parameters into RAW content
-    var raw = ""
-    raw += "from: "    + params.from
-    raw += "\r\nto: "      + params.to
-    if (params.cc)  raw += "\r\ncc: "  + params.cc;
-    if (params.bcc) raw += "\r\nbcc: " + params.bcc;
-    raw += "\r\nSubject:"  + params.subject
-    raw += "\r\n"  + params.body
+  server.send({
+    from:    params.from,
+    to:      params.to,
+    subject: params.subject,
+    attachment: [{
+      data: params.body,
+      alternative: true
+    }]
+  }, function(err, message) {
 
-    var rawb64 = base64url.encode(raw);
-    self.log.debug('b64 encoded message:\n' + rawb64);
+    if (err) { callback(err); return null; }
 
-    self.gmail.users.messages.send({
-      auth: auth,
-      userId: self.userId,
-      resource: {
-        raw: rawb64
-      }
-    }, function(err, response) {
-
-        if (err) { callback(err); return null }
-
-        self.log.debug('sendMessage - Received response:')
-        self.log.debug(response)
-        callback(null,response)
-
-    })
-  })
+    self.log.info("Email sent");
+    callback(null, message);
+  });
 
 }
 
@@ -462,22 +459,22 @@ method.sendMessage = function (params,callback)  {
  * @param  {string} params.messageId   - Message to trash
  * @param  {callback} callback - The callback that handles the response.
  */
-method.updateMessage = function (params,callback)  {
+method.trashMessage = function (params,callback)  {
 
   var self = this
 
   googleAuth.authorize(function (err, auth) {
 
-    if (err) { callback(err); return null}
+    if (err) { callback(err); return null }
 
     self.gmail.users.messages.trash({
       auth: auth,
-      id: params.messageId,
       userId: self.userId,
+      id: params.messageId
     }, function(err, response) {
 
       if (err) {
-        var errMsg = 'gmailModel.updateMessage: The google API returned an error: ' + err;
+        var errMsg = 'gmailModel.trashMessage: The google API returned an error: ' + err;
         self.log.error(errMsg)
         callback(err)
         return null
