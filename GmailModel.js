@@ -16,9 +16,9 @@
 
 "use strict"
 
-const google       = require('googleapis'),
-      doGoogleAuth = require('do-google-auth'),
-      emailjs      = require('emailjs')
+var google       = require('googleapis'),
+    doGoogleAuth = require('do-google-auth'),
+    emailjs      = require('emailjs')
 
 var method = GmailModel.prototype;
 
@@ -42,31 +42,56 @@ var name
  * @variation v1
  * @this GmailModel
  * @param {object=} options Options for Gmail
+ * @param {string} appSpecificPassword - allows you to send emails
+ * @param {string} clientSecretFile -
+ * @param {string} emailsFrom - 'From' address on emails
+ * @param {string} googleScopes -
+ * @param {string} name - Name of this mailbox
+ * @param {string} tokenDir -
+ * @param {string} tokenFile - 
+ * @param {string} user - Gmail username (for sending emails)
+ * @param {string} userId - Gmail userId (defaults to 'me')
  */
 
 function GmailModel(params) {
 
-  this.name      = params.name
-  this.userId    = params.userId
+  this.name       = params.name
+  this.userId     = (params.userId === undefined)? 'me' : params.userId;
 
-  this.user      = params.user
-  this.appSpecificPassword  = params.appSpecificPassword
+  // Needed when sending emails
+  this.appSpecificPassword  = params.appSpecificPassword || null
+  this.emailsFrom           = params.emailsFrom || null;
+  this.user                 = params.user || null
 
-  googleAuth = new doGoogleAuth(
+  this.googleAuth = new doGoogleAuth(
     params.googleScopes,
     params.tokenFile,
     params.tokenDir,
     params.clientSecretFile
   );
 
-  this.googleAuth = params.googleAuth;
-
   this.gmail = google.gmail('v1');
 
 
-  this.log4js = params.log4js
-  this.log = this.log4js.getLogger('Mailbox-' + this.name);
-  this.log.setLevel(params.logLevel);
+  if (params.log4js) {
+
+    this.log4js = params.log4js
+    this.log = this.log4js.getLogger('Mailbox-' + this.name);
+    this.log.setLevel(params.logLevel);
+
+  } else {
+
+    var logStub = function (msg) {/*console.log(msg)*/}
+
+    this.log = {
+      dev: logStub,
+      debug: logStub,
+      error: logStub,
+      info: logStub,
+      trace: logStub
+    }
+  }
+
 }
 
 /**
@@ -89,7 +114,7 @@ method.createLabel = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -133,7 +158,7 @@ method.deleteLabel = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -172,7 +197,7 @@ method.getAttachment = function (params,callback) {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -275,7 +300,7 @@ method.getMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -319,7 +344,7 @@ method.listLabels = function (callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (err, auth) {
+  this.googleAuth.authorize( function (err, auth) {
 
     if (err) { callback(err); return null}
 
@@ -349,8 +374,9 @@ method.listLabels = function (callback)  {
  * @memberOf! gmailModel(v1)
  *
  * @param  {object} params - Parameters for request
- * @param  {string} params.labelIds - The ID of the labels on which to filter the search.
  * @param  {string} params.freetextSearch - Gmail search parameters
+ * @param  {string} params.labelIds - The ID of the labels on which to filter the search.
+ * @param  {string} params.maxResults - Max results to return from the search
  * @param  {callback} callback - The callback that handles the response.
  */
 method.listMessages = function (params,callback)  {
@@ -363,7 +389,7 @@ method.listMessages = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize( function (err, auth) {
+  this.googleAuth.authorize( function (err, auth) {
 
     if (err) { callback(err); return null }
 
@@ -406,11 +432,11 @@ method.listMessages = function (params,callback)  {
  * @memberOf! gmailModel(v1)
  *
  * @param  {object} params - Parameters for request
- * @param  {string} params.from - The sender
- * @param  {string} params.to - The recipient
- * @param  {string} params.subject - subject
  * @param  {string} params.body - Email body
- * @param  {callback} callback - The callback that handles the response.
+ * @param  {string} params.subject - subject
+ * @param  {string} params.to - The recipient
+ * @param  {callback} callback - The callback that handles the response. Returns callback(err, message)
+ * @returns {string} message - The callback that handles the response.
  */
 method.sendMessage = function (params,callback)  {
 
@@ -425,14 +451,14 @@ method.sendMessage = function (params,callback)  {
     ssl:      true
   });
 
-  var from    = params.from,
+  var from    = (self.emailsFrom)? self.emailsFrom : params.from,
       to      = params.to,
       subject = params.subject;
 
   server.send({
-    from:    params.from,
-    to:      params.to,
-    subject: params.subject,
+    from:    from,
+    to:      to,
+    subject: subject,
     attachment: [{
       data: params.body,
       alternative: true
@@ -471,7 +497,7 @@ method.trashMessages = function (params,callback)  {
   var responses = (typeof params.responses !== 'undefined')? params.responses : [];
 
 
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null }
 
@@ -527,7 +553,7 @@ method.updateMessage = function (params,callback)  {
 
   // Authorize a client with the loaded credentials, then call the
   // Gmail API.
-  googleAuth.authorize(function (err, auth) {
+  this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null}
 
