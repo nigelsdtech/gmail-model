@@ -496,12 +496,12 @@ method.trashMessages = function (params,callback)  {
   // Initialize params.responses if this isn't a recursive call
   var responses = (typeof params.responses !== 'undefined')? params.responses : [];
 
-
+  // Authorize a client with the loaded credentials, then call the
+  // Gdrive API.
   this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null }
 
-    self.log.info('Trashing message ' + messageId);
     self.gmail.users.messages.trash({
       auth: auth,
       userId: self.userId,
@@ -515,11 +515,11 @@ method.trashMessages = function (params,callback)  {
         return null
       }
 
-      self.log.info('Trashed message ' + messageId);
       responses.push(response);
+      params.messageIds.splice(0,1)
 
-      messageIds.splice(0,1)
-      if (params.messageIds.length > 1) { 
+      if (params.messageIds.length > 0) {
+        params.responses = responses
         self.trashMessages({
           messageIds: messageIds,
           responses: responses
