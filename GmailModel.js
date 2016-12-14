@@ -310,7 +310,8 @@ method.getMessage = function (params,callback)  {
     var gParams = {
       auth: auth,
       userId: self.userId,
-      id: params.messageId
+      id: params.messageId,
+      prettyPrint: false
     }
 
     if (params.hasOwnProperty('format'))          gParams.format          = params.format;
@@ -382,10 +383,11 @@ method.listLabels = function (callback)  {
  * @alias gmailModel.listMessages
  * @memberOf! gmailModel(v1)
  *
- * @param  {object} params - Parameters for request
- * @param  {string} params.freetextSearch - Gmail search parameters
- * @param  {string} params.labelIds - The ID of the labels on which to filter the search.
- * @param  {string} params.maxResults - Max results to return from the search
+ * @param  {object}   params - Parameters for request
+ * @param  {string}   params.freetextSearch - Gmail search parameters
+ * @param  {string}   params.labelIds - The ID of the labels on which to filter the search.
+ * @param  {string}   params.maxResults - Max results to return from the search
+ * @param  {string[]} params.retFields - Optional. The specific resource fields to return in the response.
  * @param  {callback} callback - The callback that handles the response.
  */
 method.listMessages = function (params,callback)  {
@@ -404,12 +406,14 @@ method.listMessages = function (params,callback)  {
 
     var gParams = {
       auth: auth,
-      userId: self.userId
+      userId: self.userId,
+      prettyPrint: false
     }
 
     if (params.hasOwnProperty('freetextSearch')) gParams.q          = params.freetextSearch;
     if (params.hasOwnProperty('labelIds'))       gParams.labelIds   = params.labelIds;
     if (params.hasOwnProperty('maxResults'))     gParams.maxResults = params.maxResults;
+    if (params.hasOwnProperty('retFields'))      gParams.fields     = params.retFields.join(',');
 
     self.gmail.users.messages.list( gParams, function(err, response) {
         if (err) {
@@ -419,7 +423,7 @@ method.listMessages = function (params,callback)  {
 
         var messages
 
-        if (response.resultSizeEstimate == 0) {
+        if (response.hasOwnProperty('resultSizeEstimate') && response.resultSizeEstimate == 0) {
           messages = []
         } else {
           messages = response.messages;
