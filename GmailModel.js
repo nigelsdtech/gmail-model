@@ -29,7 +29,8 @@ var name
    ,log
    ,log4js
    ,appSpecificPassword
-   ,user;
+   ,user
+   ,sendServer;
 
 
 
@@ -62,6 +63,7 @@ function GmailModel(params) {
   this.appSpecificPassword  = params.appSpecificPassword || null
   this.emailsFrom           = params.emailsFrom || null;
   this.user                 = params.user || null
+
 
   this.googleAuth = new doGoogleAuth(
     params.googleScopes,
@@ -288,8 +290,11 @@ method.getLabelId = function (params,callback) {
  * @alias gmailModel.getMessage
  * @memberOf! gmailModel(v1)
  *
- * @param  {object} params - Parameters for request
- * @param  {string} params.messageId - The message ID.
+ * @param  {object}   params - Parameters for request
+ * @param  {string}   params.messageId - The message ID.
+ * @param  {string=}  params.format - 'full', 'metadata', 'minimal', 'raw'.
+ * @param  {string[]} params.metadataHeaders - specifc headers to be returned.
+ * @param  {string[]} params.retFields - Optional. The specific resource fields to return in the response.
  * @param  {callback} callback - The callback that handles the response.
  */
 method.getMessage = function (params,callback)  {
@@ -302,15 +307,19 @@ method.getMessage = function (params,callback)  {
   // Gmail API.
   this.googleAuth.authorize(function (err, auth) {
 
+    var gParams = {
+      auth: auth,
+      userId: self.userId,
+      id: params.messageId
+    }
+
+    if (params.hasOwnProperty('format'))          gParams.format          = params.format;
+    if (params.hasOwnProperty('metadataHeaders')) gParams.metadataHeaders = params.metadataHeaders;
+    if (params.hasOwnProperty('retFields'))       gParams.fields          = params.retFields;
+
     if (err) { callback(err); return null}
 
-    self.gmail.users.messages.get(
-      {
-        auth: auth,
-        userId: self.userId,
-        id: params.messageId
-      },
-      function(err, response) {
+    self.gmail.users.messages.get(gParams, function(err, response) {
         if (err) {
           console.log('The API returned an error: ' + err);
 	  callback(err)
@@ -395,7 +404,7 @@ method.listMessages = function (params,callback)  {
 
     var gParams = {
       auth: auth,
-      userId: self.userId,
+      userId: self.userId
     }
 
     if (params.hasOwnProperty('freetextSearch')) gParams.q          = params.freetextSearch;
@@ -444,18 +453,21 @@ method.sendMessage = function (params,callback)  {
 
   self.log.debug('Sending message')
 
-  var server = emailjs.server.connect({
-    user:     self.user,
-    password: self.appSpecificPassword,
-    host:     'smtp.gmail.com',
-    ssl:      true
-  });
+  if (!this.sendServer) {
+    this.sendServer = emailjs.server.connect({
+      user:     self.user,
+      password: self.appSpecificPassword,
+      host:     'smtp.gmail.com',
+      ssl:      true,
+      port:     465
+    });
+  }
 
   var from    = (self.emailsFrom)? self.emailsFrom : params.from,
       to      = params.to,
       subject = params.subject;
 
-  server.send({
+  this.sendServer.send({
     from:    from,
     to:      to,
     subject: subject,
@@ -496,16 +508,17 @@ method.trashMessages = function (params,callback)  {
   // Initialize params.responses if this isn't a recursive call
   var responses = (typeof params.responses !== 'undefined')? params.responses : [];
 
-
+  // Authorize a client with the loaded credentials, then call the
+  // Gdrive API.
   this.googleAuth.authorize(function (err, auth) {
 
     if (err) { callback(err); return null }
 
-    self.log.info('Trashing message ' + messageId);
     self.gmail.users.messages.trash({
       auth: auth,
       userId: self.userId,
-      id: messageId
+      id: messageId,
+      fields: 'id'
     }, function(err, response) {
 
       if (err) {
@@ -515,11 +528,11 @@ method.trashMessages = function (params,callback)  {
         return null
       }
 
-      self.log.info('Trashed message ' + messageId);
       responses.push(response);
+      params.messageIds.splice(0,1)
 
-      messageIds.splice(0,1)
-      if (params.messageIds.length > 1) { 
+      if (params.messageIds.length > 0) {
+        params.responses = responses
         self.trashMessages({
           messageIds: messageIds,
           responses: responses
