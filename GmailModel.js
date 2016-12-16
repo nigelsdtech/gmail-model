@@ -421,11 +421,8 @@ method.listMessages = function (params,callback)  {
           return;
         }
 
-        var messages
-
-        if (response.hasOwnProperty('resultSizeEstimate') && response.resultSizeEstimate == 0) {
-          messages = []
-        } else {
+        var messages = []
+        if (response.messages) {
           messages = response.messages;
         }
 
