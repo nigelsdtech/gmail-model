@@ -307,6 +307,8 @@ method.getMessage = function (params,callback)  {
   // Gmail API.
   this.googleAuth.authorize(function (err, auth) {
 
+    if (err) { callback(err); return null}
+
     var gParams = {
       auth: auth,
       userId: self.userId,
@@ -316,9 +318,7 @@ method.getMessage = function (params,callback)  {
 
     if (params.hasOwnProperty('format'))          gParams.format          = params.format;
     if (params.hasOwnProperty('metadataHeaders')) gParams.metadataHeaders = params.metadataHeaders;
-    if (params.hasOwnProperty('retFields'))       gParams.fields          = params.retFields;
-
-    if (err) { callback(err); return null}
+    if (params.hasOwnProperty('retFields'))       gParams.fields          = params.retFields.join(",");
 
     self.gmail.users.messages.get(gParams, function(err, response) {
         if (err) {
@@ -494,8 +494,9 @@ method.sendMessage = function (params,callback)  {
  * @alias gmailModel.trashMessages
  * @memberOf! gmailModel(v1)
  *
- * @param  {object} params - Parameters for request
- * @param  {string} params.messageIds - Messages to trash
+ * @param  {object}    params - Parameters for request
+ * @param  {string[]} params.messageIds - Messages to trash
+ * @param  {string[]} params.retFields - Optional. The specific resource fields to return in the response.
  * @param  {string} params.responses - Responses from trashed messages (only used when calling recursively)
  * @param  {callback} callback - The callback that handles the response.
  */
@@ -515,12 +516,15 @@ method.trashMessages = function (params,callback)  {
 
     if (err) { callback(err); return null }
 
-    self.gmail.users.messages.trash({
+    var gParams = {
       auth: auth,
       userId: self.userId,
-      id: messageId,
-      fields: 'id'
-    }, function(err, response) {
+      id: messageId
+    }
+
+    if (params.hasOwnProperty('retFields')) gParams.fields = params.retFields.join(',');
+
+    self.gmail.users.messages.trash(gParams, function(err, response) {
 
       if (err) {
         var errMsg = 'gmailModel.trashMessage: The google API returned an error when trashing message ' + messageId + ': ' + err;
@@ -534,10 +538,7 @@ method.trashMessages = function (params,callback)  {
 
       if (params.messageIds.length > 0) {
         params.responses = responses
-        self.trashMessages({
-          messageIds: messageIds,
-          responses: responses
-        }, callback);
+        self.trashMessages(params, callback);
       } else {
         callback(null,responses)
       }
