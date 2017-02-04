@@ -514,7 +514,11 @@ method.trashMessages = function (params,callback)  {
   // Gdrive API.
   this.googleAuth.authorize(function (err, auth) {
 
-    if (err) { callback(err); return null }
+    if (err) {
+      var errMsg = 'gmailModel.trashMessage: Authorizing (%s): google API Error: (%s)', messageId, err;
+      callback(errMsg);
+      return null
+    }
 
     var gParams = {
       auth: auth,
@@ -527,9 +531,9 @@ method.trashMessages = function (params,callback)  {
     self.gmail.users.messages.trash(gParams, function(err, response) {
 
       if (err) {
-        var errMsg = 'gmailModel.trashMessage: The google API returned an error when trashing message ' + messageId + ': ' + err;
+        var errMsg = 'gmailModel.trashMessage: Trashing (%s): google API Error: (%s)', messageId, err;
         self.log.error(errMsg)
-        callback(err)
+        callback(errMsg)
         return null
       }
 
