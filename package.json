@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/nigelsdtech/gmail-model#readme",
   "dependencies": {
+    "batchflow": "0.4.0",
     "do-google-auth": "git://github.com/nigelsdtech/do-google-auth.git",
     "emailjs": "1.0.4",
     "google-auth-library": "0.9.7",

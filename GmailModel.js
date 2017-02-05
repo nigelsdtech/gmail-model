@@ -18,7 +18,8 @@
 
 var google       = require('googleapis'),
     doGoogleAuth = require('do-google-auth'),
-    emailjs      = require('emailjs')
+    emailjs      = require('emailjs'),
+    batch        = require('batchflow')
 
 var method = GmailModel.prototype;
 
@@ -494,51 +495,47 @@ method.sendMessage = function (params,callback)  {
  * @alias gmailModel.trashMessages
  * @memberOf! gmailModel(v1)
  *
- * @param  {object}    params - Parameters for request
+ * @param  {object}   params - Parameters for request
  * @param  {string[]} params.messageIds - Messages to trash
  * @param  {string[]} params.retFields - Optional. The specific resource fields to return in the response.
- * @param  {string} params.responses - Responses from trashed messages (only used when calling recursively)
  * @param  {callback} callback - The callback that handles the response.
  */
 method.trashMessages = function (params,callback)  {
 
   var self = this
 
-  var messageIds = params.messageIds,
-      messageId  = messageIds[0];
+  var commonParams = {
+     userId: self.userId,
+  }
+  if (params.hasOwnProperty('retFields')) commonParams.fields = params.retFields.join(',');
 
-  // Initialize params.responses if this isn't a recursive call
-  var responses = (typeof params.responses !== 'undefined')? params.responses : [];
+  // Batch up the requests so as not to smash gmail
+  var bf = batch(params.messageIds);
 
-  // Authorize a client with the loaded credentials, then call the
-  // Gdrive API.
-  this.googleAuth.authorize(function (err, auth) {
+  bf.parallel(10)
 
-    if (err) { callback(err); return null }
-
-    var gParams = {
-      auth: auth,
-      userId: self.userId,
-      id: messageId
-    }
-
-    if (params.hasOwnProperty('retFields')) gParams.fields = params.retFields.join(',');
-
-    self.gmail.users.messages.trash(gParams, function(err, response) {
+  bf.each( function(idx,id,done) {
+    // Authorize a client with the loaded credentials, then call the
+    // Gdrive API.
+    self.googleAuth.authorize(function (err, auth) {
 
       if (err) { callback(err); return null }
 
-      responses.push(response);
-      params.messageIds.splice(0,1)
+      var gParams  = commonParams
+      gParams.auth = auth,
+      gParams.id   = id
 
-      if (params.messageIds.length > 0) {
-        params.responses = responses
-        self.trashMessages(params, callback);
-      } else {
-        callback(null,responses)
-      }
+      self.gmail.users.messages.trash(gParams, function(err, response) {
+        if (err) { callback(err); return null }
+        done(response)
+      })
+
     });
-  });
+
+  }).end (function (responses) {
+    callback(null,responses)
+  })
+
 }
 
 
