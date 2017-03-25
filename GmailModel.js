@@ -322,6 +322,7 @@ method.getMessage = function (params,callback)  {
     if (params.hasOwnProperty('retFields'))       gParams.fields          = params.retFields.join(",");
 
     self.gmail.users.messages.get(gParams, function(err, response) {
+
         if (err) {
           console.log('The API returned an error: ' + err);
 	  callback(err)
@@ -336,6 +337,53 @@ method.getMessage = function (params,callback)  {
 
 }
 
+
+/**
+ * gmailModel.getMessages
+ *
+ * @desc Get multiple messages from the specified message IDs.
+ *
+ * @alias gmailModel.getMessages
+ * @memberOf! gmailModel(v1)
+ *
+ * @param  {object}   params - Parameters for request
+ * @param  {string[]} params.messageIds - The message Ids.
+ * @param  {string=}  params.format - 'full', 'metadata', 'minimal', 'raw'.
+ * @param  {string[]} params.metadataHeaders - specifc headers to be returned.
+ * @param  {string[]} params.retFields - Optional. The specific resource fields to return in the response.
+ * @param  {callback} callback - The callback that handles the response.
+ */
+method.getMessages = function (params,callback)  {
+
+    var self = this;
+
+    var bf = batch(params.messageIds);
+
+    bf.parallel(10)
+
+    var errFound = false
+
+    bf.each( function(idx,id,done) {
+
+      var moddedParams = {
+        messageId: id,
+        format: params.format,
+        metadataHeaders: params.metadataHeaders,
+        retFields: params.retFields
+      }
+
+      self.getMessage(moddedParams, function (err, message) {
+        if (err) { throw new Error(err) }
+        if (!errFound) done(message); else done()
+      })
+
+    }).error (function (err) {
+      if (!errFound) callback(err)
+      errFound = true;
+    }).end (function (messages) {
+      if (!errFound) callback(null,messages)
+    })
+}
 
 /**
  * gmailModel.listLabels
@@ -547,9 +595,10 @@ method.trashMessages = function (params,callback)  {
  * @alias gmailModel.updateMessage
  * @memberOf! gmailModel(v1)
  *
- * @param  {object} params - Parameters for request
- * @param  {string} params.messageId   - Message to modify
- * @param  {string} params.addLabelIds - List of label ID's to add to the message
+ * @param  {object=}  params                - Parameters for request
+ * @param  {string[]} params.addLabelIds    - List of label ID's to add to the message
+ * @param  {string}   params.messageId      - Message to modify. Pass in an array to achieve batch modification
+ * @param  {string[]} params.removeLabelIds - List of label ID's to remove from the message
  * @param  {callback} callback - The callback that handles the response.
  */
 method.updateMessage = function (params,callback)  {
@@ -564,15 +613,26 @@ method.updateMessage = function (params,callback)  {
 
     if (err) { callback(err); return null}
 
-    self.gmail.users.messages.modify({
+    var modFn = "modify"
+
+    var gParams = {
       auth: auth,
-      id: params.messageId,
       userId: self.userId,
       resource: {
         addLabelIds: params.addLabelIds,
         removeLabelIds: params.removeLabelIds
       }
-    }, function(err, response) {
+    }
+
+    // Invoke the "batchModify" API call if the messageId was an array
+    if (Array.isArray(params.messageId)) {
+      modFn = "batchModify"
+      gParams.resource.ids = params.messageId
+    } else {
+      gParams.id = params.messageId
+    }
+
+    self.gmail.users.messages[modFn](gParams, function(err, response) {
       if (err) {
         var errMsg = 'gmailModel.updateMessage: The google API returned an error: ' + err;
         self.log.error(errMsg)
