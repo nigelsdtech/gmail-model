@@ -366,11 +366,12 @@ method.getMessages = function (params,callback)  {
     bf.each( function(idx,id,done) {
 
       var moddedParams = {
-        messageId: id,
-        format: params.format,
-        metadataHeaders: params.metadataHeaders,
-        retFields: params.retFields
+        messageId: id
       }
+
+      if (params.hasOwnProperty('format'))          moddedParams.format          = params.format;
+      if (params.hasOwnProperty('metadataHeaders')) moddedParams.metadataHeaders = params.metadataHeaders;
+      if (params.hasOwnProperty('retFields'))       moddedParams.fields          = params.retFields;
 
       self.getMessage(moddedParams, function (err, message) {
         if (err) { throw new Error(err) }
