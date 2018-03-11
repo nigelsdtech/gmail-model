@@ -371,7 +371,7 @@ method.getMessages = function (params,callback)  {
 
       if (params.hasOwnProperty('format'))          moddedParams.format          = params.format;
       if (params.hasOwnProperty('metadataHeaders')) moddedParams.metadataHeaders = params.metadataHeaders;
-      if (params.hasOwnProperty('retFields'))       moddedParams.fields          = params.retFields;
+      if (params.hasOwnProperty('retFields'))       moddedParams.retFields       = params.retFields;
 
       self.getMessage(moddedParams, function (err, message) {
         if (err) { throw new Error(err) }
